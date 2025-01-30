@@ -2,11 +2,6 @@ namespace Falcon.Infrastructure.Abstractions;
 
 public record PagedResult<TResult>
 {
-    public PagedResult(IEnumerable<TResult> items, long count)
-    {
-        Items = items;
-        Count = count;
-    }
-    public IEnumerable<TResult> Items { get; set; }
+    public IEnumerable<TResult> Items { get; set; } = Array.Empty<TResult>();
     public long Count { get; set; }
 }

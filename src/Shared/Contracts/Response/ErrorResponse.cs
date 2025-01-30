@@ -2,51 +2,61 @@ namespace Falcon.Contracts;
 
 public record ErrorResponse : IErrorResponse
 {
-    public string? Message { get; set; }
+    public string Message { get; set; } = string.Empty;
     public string? Code { get; set; }
     public string? StackTrace { get; set; }
-}
 
-public static class ExceptionExtension
-{
-    public static ErrorResponse SetMessage(this ErrorResponse error, string message)
+    public class Builder
     {
-        error.Message = message;
-        return error;
-    }
-    public static ErrorResponse SetCode(this ErrorResponse error, string code)
-    {
-        error.Code = code;
-        return error;
-    }
-    public static ErrorResponse SetStackTrace(this ErrorResponse error, string stackTrace)
-    {
-#if DEBUG
-        error.StackTrace = stackTrace;
-#endif
-        return error;
-    }
+        private readonly ErrorResponse _errorResponse = new();
 
-    public static ErrorResponse SetFromException(this ErrorResponse error, Exception ex)
-    {
-        error.SetMessage(ex.Message);
-        error.SetStackTrace(ex.GetInnerStackTrace());
-        return error;
-    }
-    public static string GetInnerStackTrace(this Exception? exception)
-    {
-        var sb = new StringBuilder();
-        int level = 0;
-        while (exception != null)
+        public Builder Message(string message)
         {
-            sb.Append("Level: ").Append(level)
-              .Append(", Exception: ").Append(exception.Message)
-              .Append(", StackTrace: ").Append(exception.StackTrace)
-              .Append(Environment.NewLine);
-
-            level++; // Increment level after appending to StringBuilder
-            exception = exception.InnerException; // Move to the next inner exception
+            _errorResponse.Message = message;
+            return this;
         }
-        return sb.ToString();
+        public Builder Code(string code)
+        {
+            _errorResponse.Code = code;
+            return this;
+        }
+        public Builder StackTrace(string stackTrace)
+        {
+#if DEBUG
+            _errorResponse.StackTrace = stackTrace;
+#endif
+            return this;
+        }
+
+        public Builder FromException(Exception exception)
+        {
+            _errorResponse.Message = exception.Message;
+            _errorResponse.StackTrace = InnerStackTrace(exception);
+            return this;
+        }
+
+        private static string InnerStackTrace(Exception? exception)
+        {
+            if (exception is null)
+                return string.Empty;
+            var sb = new StringBuilder();
+            int level = 0;
+            for (var ex = exception; ex != null; ex = ex.InnerException)
+            {
+                sb.AppendFormat("{3}Level: {0}{3}, Exception: {1}{3}, StackTrace: {2}{3}",
+                                level,
+                                ex.Message,
+                                ex.StackTrace,
+                                Environment.NewLine);
+                sb.AppendLine(new string('-', 40));
+                level++;
+            }
+            return sb.ToString();
+        }
+
+        public ErrorResponse Build()
+        {
+            return _errorResponse;
+        }
     }
 }

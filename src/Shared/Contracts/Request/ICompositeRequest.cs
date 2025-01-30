@@ -2,5 +2,5 @@ namespace Falcon.Contracts;
 
 public interface ICompositeRequest : IApiRequest
 {
-    Dictionary<string, IApiRequest>? Requests { get; set; }
+    Dictionary<string, IApiRequest> Requests { get; set; }
 }

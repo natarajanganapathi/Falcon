@@ -14,6 +14,7 @@
     <RepositoryUrl>https://github.com/falcon-architecture/falcon</RepositoryUrl>
     <PackageTags>falcon,webapi</PackageTags>
     <PackageIcon>falcon.jpg</PackageIcon>
+
     <!-- Enable Source Link -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -37,8 +38,8 @@
     <None Include="../../../resources/falcon.jpg" Pack="true" PackagePath="\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Application\Abstractions\Abstractions.csproj" />
     <ProjectReference Include="..\..\Shared\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\Application\Abstractions\Abstractions.csproj" />
     <ProjectReference Include="..\..\Domain\Abstractions\Abstractions.csproj" />
     <ProjectReference Include="..\..\Infrastructure\Abstractions\Abstractions.csproj" />
   </ItemGroup>

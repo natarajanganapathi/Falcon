@@ -1,5 +1,3 @@
-using Microsoft.Extensions.Logging;
-
 namespace Falcon.Infrastructure.Abstractions.Middlewares;
 
 public class ExceptionHandlingMiddleware
@@ -21,15 +19,19 @@ public class ExceptionHandlingMiddleware
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "An unhandled exception has occurred.");
             await HandleExceptionAsync(context, ex);
         }
     }
 
-    private Task HandleExceptionAsync(HttpContext context, Exception ex)
+    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        _logger.LogError(ex, "An error occurred: {ErrorMessage}", ex.Message);
-        context.Response.ContentType = "text/plain";
-        context.Response.StatusCode = 500;
-        return context.Response.WriteAsync("An unexpected error occurred. Please try again later.");
+        context.Response.ContentType = "application/json";
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        ErrorResponse errorResponse = new ErrorResponse.Builder()
+            .Message("An error occurred while processing your request.")
+            .FromException(exception)
+            .Build();
+        return context.Response.WriteAsync(JsonSerializer.Serialize(errorResponse));
     }
 }

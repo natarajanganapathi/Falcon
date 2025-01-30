@@ -32,7 +32,7 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     {
         var query = GetQueryBuilder(request).BuildProjection(DbSet);
 #if DEBUG
-        logger.LogInformation("Sql Query: {query}", query.ToQueryString());
+        logger.LogInformation("Sql Query: {Query}", query.ToQueryString());
 #endif
         return await query.ToListAsync(cancellationToken);
     }
@@ -53,13 +53,13 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     public async Task<TEntity> GetAsync(TId id, CancellationToken cancellationToken = default)
     {
         // Need to add the default filter condition to filter deleted items.
-        var tid = id ?? throw new QueryEntityException("Id is null");
+        var tid = id ?? throw new QueryException("The provided Id is null or invalid");
         var result = await DbSet.FindAsync([tid], cancellationToken);
         if (result is IDeletableEntity obj)
         {
             result = obj.Status == DeletableEntityStatus.Active ? result : null;
         }
-        return result ?? throw new QueryEntityException($"Invalid Id {id}");
+        return result ?? throw new QueryException($"Entity with ID '{id}' not found or has been deleted.");
     }
     public async Task<IEnumerable<TEntity>> GetManyAsync(TId[] ids, CancellationToken cancellationToken = default)
     {
@@ -67,7 +67,7 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
         var deletedEntities = results.OfType<IDeletableEntity>().Where(x => x.Status is not DeletableEntityStatus.Active);
         if (deletedEntities.Any() || ids.Length != results.Count)
         {
-            throw new QueryEntityException("One or more id is not found");
+            throw new QueryException("One or more entities with the provided IDs were not found or have been deleted.");
         }
         return results;
     }
@@ -87,7 +87,7 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     }
     public async Task<TEntity> CreateAsync(ICommandRequest<TEntity> request, CancellationToken cancellationToken = default)
     {
-        var entity = request.Data ?? throw new CreateEntityException("Entity is null");
+        var entity = request.Data ?? throw new PersistenceException("Entity is null");
         if (entity is IDeletableEntity obj) { obj.Status = DeletableEntityStatus.Active; }
         var entityEntry = await DbSet.AddAsync(entity, cancellationToken);
         await DbContext.SaveChangesAsync(requestContext.UserId, cancellationToken);
@@ -95,7 +95,7 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     }
     public async Task<IEnumerable<TEntity>> CreateManyAsync(ICommandRequest<TEntity[]> request, CancellationToken cancellationToken = default)
     {
-        var entities = request.Data ?? throw new CreateEntityException("Entities are null");
+        var entities = request.Data ?? throw new PersistenceException("Entities are null");
         foreach (var entity in entities)
         {
             if (entity is IDeletableEntity obj) { obj.Status = DeletableEntityStatus.Active; }
@@ -106,14 +106,14 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     }
     public async Task<TEntity> UpdateAsync(TId id, ICommandRequest<TEntity> request, CancellationToken cancellationToken = default)
     {
-        var entity = request.Data ?? throw new UpdateEntityException("Entity is null");
-        entity.Id = id ?? throw new UpdateEntityException("Id is null");
+        var entity = request.Data ?? throw new PersistenceException("The provided entity is null or invalid");
+        entity.Id = id ?? throw new PersistenceException("The provided entity Id is null or invalid");
         if (entity is IDeletableEntity)
         {
             var status = await GetStats(id, cancellationToken);
             if (status != DeletableEntityStatus.Active)
             {
-                throw new UpdateEntityException($"Entity with ID '{id}' is not live and cannot be updated.");
+                throw new PersistenceException($"Entity with ID '{id}' is not active and cannot be updated.");
             }
         }
         return await UpdateAsync(entity, cancellationToken);
@@ -135,19 +135,20 @@ public abstract class SqlRepository<TId, TEntity> : IRepository<TId, TEntity> wh
     }
     public async Task<TEntity> PatchAsync(TId id, ICommandRequest<JsonPatchDocument<TEntity>> request, CancellationToken cancellationToken = default)
     {
-        var patchDocument = request.Data ?? throw new UpdateEntityException("JsonPatchDocument<TEntity> is null");
+        var patchDocument = request.Data ?? throw new PersistenceException("The provided JsonPatchDocument<TEntity> is null.");
         TEntity original = await GetAsync(id, cancellationToken);
         patchDocument.ApplyTo(original);
         return await UpdateAsync(original, cancellationToken);
     }
     public async Task<TEntity> ReplaceAsync(TId id, ICommandRequest<TEntity> request, CancellationToken cancellationToken)
     {
-        var entity = request.Data ?? throw new UpdateEntityException("Entity is null");
+        var entity = request.Data ?? throw new PersistenceException("The provided entity is null or invalid");
         var sourceEntity = await GetAsync(id, cancellationToken);
-        sourceEntity = sourceEntity ?? throw new UpdateEntityException("Id is invalid");
+        sourceEntity = sourceEntity ?? throw new PersistenceException($"Entity with ID '{id}' not found or has been deleted.");
         DbContext.Entry(sourceEntity).CurrentValues.SetValues(entity);
         var modifiedCount = await DbContext.SaveChangesAsync(requestContext.UserId, cancellationToken);
-        if (modifiedCount == 0) throw new UpdateEntityException("No records are replaced");
+        if (modifiedCount == 0) 
+            throw new PersistenceException("No records were replaced. The entity might not exist or has already been deleted.");
         return sourceEntity;
     }
 
